@@ -1,0 +1,62 @@
+name: Refresh public News & Events
+on:
+  schedule:
+    - cron: '23 11 * * *'
+  workflow_dispatch:
+concurrency:
+  group: st-george-events-pages
+  cancel-in-progress: false
+permissions: {}
+jobs:
+  build:
+    name: Test and build public page
+    if: ${{ github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends poppler-utils
+          python -m pip --disable-pip-version-check install --require-hashes --only-binary=:all: -r requirements-pages.txt
+      - name: Test and build public HTML
+        run: |
+          python -m unittest discover -s tests -v
+          bash -n refresh_web.sh
+          mkdir public
+          PYTHON=python bash ./refresh_web.sh "$PWD/public/events.html"
+          test -s public/events.html
+          printf '%s\n' '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>St. George News &amp; Events</title><p><a href="./events.html">See upcoming News &amp; Events</a></p></html>' > public/index.html
+          test "$(find public -mindepth 1 -maxdepth 1 | wc -l)" -eq 2
+      - name: Upload only the public pages
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+        with:
+          path: public
+          retention-days: 1
+  deploy:
+    name: Deploy to GitHub Pages
+    if: ${{ github.ref == 'refs/heads/main' && github.event.repository.fork == false }}
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish the Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
