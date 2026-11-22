@@ -37,8 +37,10 @@ jobs:
           mkdir public
           PYTHON=python bash ./refresh_web.sh "$PWD/public/events.html"
           test -s public/events.html
+          python ./build_parish_calendar.py --output "$PWD/public/parish-calendar.html"
+          test -s public/parish-calendar.html
           printf '%s\n' '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>St. George News &amp; Events</title><p><a href="./events.html">See upcoming News &amp; Events</a></p></html>' > public/index.html
-          test "$(find public -mindepth 1 -maxdepth 1 | wc -l)" -eq 2
+          test "$(find public -mindepth 1 -maxdepth 1 | wc -l)" -eq 3
       - name: Upload only the public pages
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
         with:
