@@ -390,7 +390,9 @@ def recurrence(record, start, left: date, right: date):
     return dates, exdates
 
 
-def from_calendar(raw: bytes, source: str, left: date, right: date, *, publish=None, extra_cancel=None):
+def from_calendar(raw: bytes, source: str, left: date, right: date, *,
+                  publish=None, extra_cancel=None, classify_record=None):
+    """Optionally classify a raw record with an internal marker, or omit it with None."""
     publish = can_publish if publish is None else publish
     by_uid = defaultdict(list)
     for record in parse_ics(raw, source):
@@ -424,12 +426,15 @@ def from_calendar(raw: bytes, source: str, left: date, right: date, *, publish=N
             title = cancellation_stem(title)
         if not publish(title, desc, source):
             return
+        marker = "" if classify_record is None else classify_record(record, parent)
+        if marker is None:
+            return
         end = start + duration if duration is not None else None
         if not in_window(start, end, left, right):
             return
         title = re.sub(r"\bFamily Minstry Potluck\b", "Family Ministry Potluck", clean(title), flags=re.I)
         calc.append(Event(title, iso(start), iso(end) if end is not None else None,
-                          source, url, group, location, cancelled=cancelled))
+                          source, url, group, location, note=marker, cancelled=cancelled))
 
     def version(record):
         return int(prop(record, "SEQUENCE", "0")), prop(record, "DTSTAMP")
