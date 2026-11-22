@@ -390,7 +390,8 @@ def recurrence(record, start, left: date, right: date):
     return dates, exdates
 
 
-def from_calendar(raw: bytes, source: str, left: date, right: date):
+def from_calendar(raw: bytes, source: str, left: date, right: date, *, publish=None, extra_cancel=None):
+    publish = can_publish if publish is None else publish
     by_uid = defaultdict(list)
     for record in parse_ics(raw, source):
         uid = prop(record, "UID")
@@ -417,9 +418,11 @@ def from_calendar(raw: bytes, source: str, left: date, right: date):
             r"\bcancel(?:led|ed)\b|\bpostponed\b|^\s*no\b", title, flags=re.I))
         # Some calendars use free-text notes instead of status for a cancellation.
         cancelled |= bool(re.match(r"\s*(?:cancel(?:led|ed)|postponed)\b", desc, flags=re.I))
+        if extra_cancel is not None:
+            cancelled |= bool(extra_cancel(desc))
         if cancelled:
             title = cancellation_stem(title)
-        if not can_publish(title, desc, source):
+        if not publish(title, desc, source):
             return
         end = start + duration if duration is not None else None
         if not in_window(start, end, left, right):
